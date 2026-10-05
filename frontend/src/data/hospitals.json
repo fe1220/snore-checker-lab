@@ -1,5 +1,5 @@
 {
-  "crawledAt": "2026-10-04T20:56:55.825Z",
+  "crawledAt": "2026-10-05T10:42:30.091Z",
   "hiraVersion": "2026.6",
   "items": [
     {
@@ -7785,7 +7785,7 @@
       "lat": 37.4963836,
       "lng": 127.1235089,
       "sourceUrl": null,
-      "homepage": null,
+      "homepage": "http://www.nph.go.kr",
       "listed": false,
       "kind": "종합병원"
     },
@@ -8656,7 +8656,7 @@
       "lng": 127.0098676,
       "sourceUrl": "https://www.resmed.kr/psg-finder/seoulboasent",
       "region": "서울",
-      "homepage": null,
+      "homepage": "http://www.boazent.co.kr",
       "listed": false,
       "kind": "의원"
     },
