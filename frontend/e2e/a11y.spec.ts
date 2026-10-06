@@ -2,6 +2,7 @@ import AxeBuilder from "@axe-core/playwright"
 import { expect, test, type Page } from "@playwright/test"
 
 // 리포트 해시: 문항 9개 전부(e7), 약한 신호 3개(3n), 신호 없음(0). lib/sleep-check.ts의 비트 순서를 따른다.
+// 질문과 리포트는 경로(self·partner)마다 문구 길이가 달라 두 경로를 모두 잰다.
 const SCREENS: {
   name: string
   path: string
@@ -9,19 +10,22 @@ const SCREENS: {
   answer?: string
 }[] = [
   { name: "s1-start", path: "/" },
-  // 광고 소재별 랜딩. app/c/[copy]의 HEADLINES 키와 같다.
-  { name: "s1-heal", path: "/c/heal" },
-  { name: "s1-disease", path: "/c/disease" },
-  { name: "s1-sleep", path: "/c/sleep" },
-  { name: "s2-check", path: "/check" },
-  // 2번 질문부터 뒤로 가기 버튼이 생긴다.
-  { name: "s2-check-back", path: "/check", answer: "아니요" },
-  { name: "s3-strong", path: "/r#v1-e7" },
-  { name: "s3-moderate", path: "/r#v1-3n" },
-  { name: "s3-weak", path: "/r#v1-0" },
-  { name: "s3-weak-v2", path: "/r#v2-0-0" },
+  { name: "s2-self", path: "/check?for=self" },
+  { name: "s2-partner", path: "/check?for=partner" },
+  // 2번 질문부터 뒤로 가기 버튼이 "이전 질문"으로 바뀐다.
+  { name: "s2-self-back", path: "/check?for=self", answer: "아니요" },
+  { name: "s2-partner-back", path: "/check?for=partner", answer: "아니요" },
+  { name: "s3-self-strong", path: "/r?for=self#v2-e7-0" },
+  { name: "s3-partner-strong", path: "/r?for=partner#v2-e7-0" },
+  { name: "s3-self-moderate", path: "/r?for=self#v2-3n-0" },
+  { name: "s3-partner-moderate", path: "/r?for=partner#v2-3n-0" },
+  { name: "s3-self-weak", path: "/r?for=self#v2-0-0" },
+  { name: "s3-partner-weak", path: "/r?for=partner#v2-0-0" },
   // 주요 신호 3문항(비트 4+8+16=28)을 모름 → 36진수 "s"
-  { name: "s3-too-early", path: "/r#v2-0-s" },
+  { name: "s3-self-too-early", path: "/r?for=self#v2-0-s" },
+  { name: "s3-partner-too-early", path: "/r?for=partner#v2-0-s" },
+  // 경로 쿼리가 없는 옛 리포트 링크(v1 포함)는 배우자 기준으로 연다.
+  { name: "s3-legacy-v1", path: "/r#v1-e7" },
   { name: "s3-shared", path: "/r?shared=1#v1-e7" },
   // 해시를 읽지 못한 리포트(찾을 수 없음 상태)
   { name: "s3-bad", path: "/r#bad" },
@@ -258,6 +262,37 @@ for (const screen of SCREENS) {
     }
   })
 }
+
+// 랜딩 카드는 카드 전체가 누르는 영역이라 일반 버튼보다 큰 88px을 지킨다(ux-spec S1).
+test.describe("s1 경로 카드", () => {
+  const MIN_CARD = 88
+  for (const width of [375, 320]) {
+    for (const scale of [1, 2]) {
+      test(`폭 ${width}px, 글자 ${scale * 100}%에서 카드 두 장이 88px 이상이고 겹치지 않는다`, async ({
+        page,
+      }) => {
+        await page.setViewportSize({ width, height: 812 })
+        await open(page, { name: "s1-start", path: "/" })
+        if (scale !== 1) await scaleText(page, scale)
+        const cards = page.getByRole("button", {
+          name: /^(내 코골이|함께 자는 사람의 코골이)/,
+        })
+        await expect(cards).toHaveCount(2)
+        const boxes = await cards.evaluateAll((els) =>
+          els.map((el) => {
+            const r = el.getBoundingClientRect()
+            return { top: r.top, bottom: r.bottom, h: r.height, w: r.width }
+          }),
+        )
+        for (const box of boxes) {
+          expect(box.h).toBeGreaterThanOrEqual(MIN_CARD)
+          expect(box.w).toBeGreaterThanOrEqual(MIN_TARGET)
+        }
+        expect(boxes[1].top - boxes[0].bottom).toBeGreaterThanOrEqual(MIN_GAP)
+      })
+    }
+  }
+})
 
 // A11Y_SHOTS=1일 때만 스크린샷을 남긴다. 검증 문서에 붙이는 용도다.
 test.describe("스크린샷", () => {
