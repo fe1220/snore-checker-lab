@@ -101,6 +101,7 @@ export async function fetchGaRows(
 // 사람 수 기준 퍼널. 단계마다 조건이 달라 따로 조회한다.
 // 병원 연결은 측정기준에 이벤트 이름을 넣지 않아, 링크와 전화를 둘 다 누른 사람도 한 번만 센다.
 const STEPS: { field: UserStep; filter: object }[] = [
+  { field: "checkStart", filter: exact("eventName", "check_start") },
   { field: "checkComplete", filter: exact("eventName", "check_complete") },
   {
     field: "clinicList",
@@ -127,10 +128,11 @@ export async function fetchUserFunnel(
   since: string,
   until: string,
   dimensions: string[],
+  steps: UserStep[] = ["checkComplete", "clinicList", "connect"],
 ): Promise<UserCount[]> {
   const client = new BetaAnalyticsDataClient({ keyFilename: c.keyFile })
   const results = await Promise.all(
-    STEPS.map(async ({ field, filter }) => {
+    STEPS.filter((s) => steps.includes(s.field)).map(async ({ field, filter }) => {
       const [res] = await client.runReport({
         property: `properties/${c.propertyId}`,
         dateRanges: [{ startDate: since, endDate: until }],

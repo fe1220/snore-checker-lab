@@ -20,7 +20,7 @@ export type GaRow = {
 export type Row = MetaRow & Omit<GaRow, "key">
 
 // 사람 수 기준 퍼널. 이벤트 수와 달리 한 사람이 병원 여러 곳을 눌러도 한 번만 센다.
-export type UserStep = "checkComplete" | "clinicList" | "connect"
+export type UserStep = "checkStart" | "checkComplete" | "clinicList" | "connect"
 export type UserCount = { values: string[]; step: UserStep; users: number } // 측정기준 값: [utm_content] 또는 [check_level, report_source]
 export type UserRow = { key: string } & Record<UserStep, number>
 
@@ -187,7 +187,9 @@ function groupUsers(counts: UserCount[], keyOf: (values: string[]) => string): U
     const key = keyOf(c.values)
     const r =
       rows.get(key) ??
-      rows.set(key, { key, checkComplete: 0, clinicList: 0, connect: 0 }).get(key)!
+      rows
+        .set(key, { key, checkStart: 0, checkComplete: 0, clinicList: 0, connect: 0 })
+        .get(key)!
     r[c.step] += c.users
   }
   return [...rows.values()]
@@ -225,11 +227,12 @@ function userTotal(rows: UserRow[]): UserRow {
   return rows.reduce<UserRow>(
     (t, r) => ({
       key: "합계",
+      checkStart: t.checkStart + r.checkStart,
       checkComplete: t.checkComplete + r.checkComplete,
       clinicList: t.clinicList + r.clinicList,
       connect: t.connect + r.connect,
     }),
-    { key: "합계", checkComplete: 0, clinicList: 0, connect: 0 },
+    { key: "합계", checkStart: 0, checkComplete: 0, clinicList: 0, connect: 0 },
   )
 }
 
@@ -243,6 +246,37 @@ function userTable(label: string, rows: UserRow[], withTotal: boolean): string {
   return `| ${label} | 체크 완료 | 병원 목록 진입 | 병원 목록 진입률 | 병원 연결 | 병원 연결률 |
 |---|---|---|---|---|---|
 ${body.map(userLine).join("\n")}`
+}
+
+export const NO_ROLE = "경로 없음"
+const ROLE_NAMES: Record<string, string> = { self: "당사자", partner: "배우자" }
+
+export function usersByRole(counts: UserCount[]): UserRow[] {
+  const names = [...Object.values(ROLE_NAMES), NO_ROLE]
+  return groupUsers(counts, ([v = ""]) => ROLE_NAMES[v] ?? NO_ROLE).sort(
+    (a, b) => names.indexOf(a.key) - names.indexOf(b.key),
+  )
+}
+
+function roleLine(r: UserRow): string {
+  return `| ${r.key} | ${int(r.checkStart)} | ${int(r.checkComplete)} | ${pct(r.checkComplete, r.checkStart)} | ${int(r.clinicList)} | ${int(r.connect)} | ${pct(r.connect, r.checkComplete)} |`
+}
+
+// 경로별 퍼널(H1). 체크 시작은 랜딩에서 경로를 고른 순간이라, 체크 시작 비중이 곧 경로 비중이다.
+export function renderRoleFunnel(byRole: UserRow[] | null): string {
+  const body =
+    byRole && byRole.length > 0
+      ? `| 경로 | 체크 시작 | 체크 완료 | 체크 완료율 | 병원 목록 진입 | 병원 연결 | 병원 연결률 |
+|---|---|---|---|---|---|---|
+${byRole.map(roleLine).join("\n")}`
+      : "경로별 숫자는 아직 없다. GA에 사용자 범위 맞춤 측정기준 `respondent_role`을 등록해야 나온다."
+  return `## 경로별 (당사자 · 배우자)
+
+${body}
+
+- 체크 완료율은 체크 시작 대비, 병원 연결률은 체크 완료 대비다. H1 판정은 결과 조회(체크 완료) 100건 이상에서 한쪽 경로가 70% 이상인지로 본다([validation](../../validation.md#h1-당사자에게-말을-거는-게-병원까지-더-잘-이어진다)).
+- "${NO_ROLE}"은 경로 속성이 없는 사람이다. 경로 저장 전에 체크했거나 공유받은 리포트로 들어온 사람이다.
+`
 }
 
 // 사람 수 기준 퍼널과 판정 단계별 표. 단계별 조회가 실패하면(맞춤 측정기준 미등록 등) byLevel이 null이다.

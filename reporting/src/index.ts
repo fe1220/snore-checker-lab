@@ -8,10 +8,12 @@ import {
   mergeRows,
   renderReport,
   renderSummary,
+  renderRoleFunnel,
   renderUserFunnel,
   replaceBetweenMarkers,
   usersByContent,
   usersByLevel,
+  usersByRole,
 } from "./report.ts"
 
 const DOCS = fileURLToPath(new URL("../../docs/meta-ads/", import.meta.url))
@@ -59,7 +61,11 @@ async function main() {
     source: process.env.UTM_SOURCE ?? "meta",
     country: process.env.GA4_COUNTRY ?? "South Korea",
   }
-  const [metaRows, gaRows, contentUsers, levelUsers] = await Promise.all([
+  const skip = (what: string) => (err: unknown) => {
+    console.warn(`${what} 조회를 건너뛰어요: ${err instanceof Error ? err.message : err}`)
+    return null
+  }
+  const [metaRows, gaRows, contentUsers, levelUsers, roleUsers] = await Promise.all([
     fetchMetaRows(meta, since, until),
     fetchGaRows(ga, since, until),
     fetchUserFunnel(ga, since, until, ["sessionManualAdContent"]),
@@ -67,10 +73,13 @@ async function main() {
     fetchUserFunnel(ga, since, until, [
       "customUser:check_level",
       "customUser:report_source",
-    ]).catch((err: unknown) => {
-      console.warn(`판정 단계별 조회를 건너뛰어요: ${err instanceof Error ? err.message : err}`)
-      return null
-    }),
+    ]).catch(skip("판정 단계별")),
+    fetchUserFunnel(ga, since, until, ["customUser:respondent_role"], [
+      "checkStart",
+      "checkComplete",
+      "clinicList",
+      "connect",
+    ]).catch(skip("경로별")),
   ])
   if (metaRows.length === 0) {
     console.log(`메타에 ${since} ~ ${until} 집행 숫자가 아직 없어요. 리포트를 쓰지 않았어요`)
@@ -86,10 +95,13 @@ async function main() {
       until,
       generatedAt,
       rows,
-      userFunnel: renderUserFunnel(
-        usersByContent(contentUsers),
-        levelUsers && usersByLevel(levelUsers),
-      ),
+      userFunnel:
+        renderRoleFunnel(roleUsers && usersByRole(roleUsers)) +
+        "\n" +
+        renderUserFunnel(
+          usersByContent(contentUsers),
+          levelUsers && usersByLevel(levelUsers),
+        ),
     }))
 
   const strategy = await readFile(`${DOCS}strategy.md`, "utf-8")

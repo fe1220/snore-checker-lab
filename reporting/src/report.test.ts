@@ -8,12 +8,14 @@ import {
   mergeRows,
   metrics,
   renderReport,
+  renderRoleFunnel,
   renderSummary,
   renderUserFunnel,
   replaceBetweenMarkers,
   total,
   usersByContent,
   usersByLevel,
+  usersByRole,
 } from "./report.ts"
 import { parseInsights } from "./meta.ts"
 import { parseGaRows } from "./ga4.ts"
@@ -157,4 +159,21 @@ test("리포트에 사람 수 퍼널을 넣고 이벤트 수 기준임을 밝힌
   })
   assert.match(md, /이벤트 수 기준이다/)
   assert.match(md, /## 사람 수 기준 퍼널/)
+})
+
+test("경로별 퍼널은 체크 시작부터 세고, 경로 속성이 없으면 경로 없음으로 둔다", () => {
+  const rows = usersByRole([
+    { values: ["partner"], step: "checkStart", users: 30 },
+    { values: ["self"], step: "checkStart", users: 70 },
+    { values: ["self"], step: "checkComplete", users: 35 },
+    { values: ["self"], step: "connect", users: 7 },
+    { values: ["(not set)"], step: "clinicList", users: 2 },
+  ])
+  assert.deepEqual(
+    rows.map((r) => r.key),
+    ["당사자", "배우자", "경로 없음"],
+  )
+  const md = renderRoleFunnel(rows)
+  assert.match(md, /\| 당사자 \| 70 \| 35 \| 50\.0% \| 0 \| 7 \| 20\.0% \|/)
+  assert.match(renderRoleFunnel(null), /경로별 숫자는 아직 없다/)
 })
