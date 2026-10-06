@@ -19,7 +19,19 @@ export type GaRow = {
 
 export type Row = MetaRow & Omit<GaRow, "key">
 
+// 사람 수 기준 퍼널. 이벤트 수와 달리 한 사람이 병원 여러 곳을 눌러도 한 번만 센다.
+export type UserStep = "checkComplete" | "clinicList" | "connect"
+export type UserCount = { value: string; step: UserStep; users: number } // value: utm_content 또는 check_level
+export type UserRow = { key: string } & Record<UserStep, number>
+
 export const UNKNOWN = "알 수 없음"
+export const NO_LEVEL = "단계 없음"
+// 리포트 화면과 같은 단계 이름을 쓴다.
+const LEVEL_NAMES: Record<string, string> = {
+  strong: "검사 권유",
+  moderate: "상담 권유",
+  weak: "신호 약함",
+}
 const ORDER = ["A", "B", "C", "D1", "D2"]
 
 const EMPTY_META = { spend: 0, impressions: 0, linkClicks: 0, landingViews: 0 }
@@ -120,6 +132,7 @@ export function renderReport(input: {
   until: string
   generatedAt: string
   rows: Row[]
+  userFunnel?: string
 }): string {
   const t = total(input.rows)
   return `# 메타 광고 결과: ${input.until}까지
@@ -134,7 +147,9 @@ ${HEADER}
 ${line(t)}
 
 - 공유 클릭 ${int(t.share)}건, 체크 시작 ${int(t.checkStart)}건
+- 이 표와 아래 소재별 표는 이벤트 수 기준이다. 한 사람이 병원 여러 곳을 누르면 병원 연결이 여러 번 잡힌다.
 
+${input.userFunnel ?? ""}
 ## 소재별
 
 메타가 예산을 반응 좋은 소재에 몰아주므로 소재별 숫자는 참고만 한다.
@@ -162,6 +177,78 @@ export function renderSummary(rows: Row[], reportPath: string): string {
 | 병원 연결 1건당 비용 | ${m.costPerConnect} |
 
 최신 리포트: [${reportPath}](${reportPath})`
+}
+
+const blank = (value: string): boolean => !value || value === "(not set)"
+
+function groupUsers(counts: UserCount[], keyOf: (value: string) => string): UserRow[] {
+  const rows = new Map<string, UserRow>()
+  for (const c of counts) {
+    const key = keyOf(c.value)
+    const r =
+      rows.get(key) ??
+      rows.set(key, { key, checkComplete: 0, clinicList: 0, connect: 0 }).get(key)!
+    r[c.step] += c.users
+  }
+  return [...rows.values()]
+}
+
+export function usersByContent(counts: UserCount[]): UserRow[] {
+  return groupUsers(counts, (v) => (blank(v) ? UNKNOWN : v.trim())).sort(
+    (a, b) => order(a.key) - order(b.key) || a.key.localeCompare(b.key),
+  )
+}
+
+export function usersByLevel(counts: UserCount[]): UserRow[] {
+  const names = [...Object.values(LEVEL_NAMES), NO_LEVEL]
+  return groupUsers(counts, (v) => LEVEL_NAMES[v] ?? NO_LEVEL).sort(
+    (a, b) => names.indexOf(a.key) - names.indexOf(b.key),
+  )
+}
+
+function userTotal(rows: UserRow[]): UserRow {
+  return rows.reduce<UserRow>(
+    (t, r) => ({
+      key: "합계",
+      checkComplete: t.checkComplete + r.checkComplete,
+      clinicList: t.clinicList + r.clinicList,
+      connect: t.connect + r.connect,
+    }),
+    { key: "합계", checkComplete: 0, clinicList: 0, connect: 0 },
+  )
+}
+
+function userLine(r: UserRow): string {
+  const name = r.key === "합계" ? "**합계**" : r.key
+  return `| ${name} | ${int(r.checkComplete)} | ${int(r.clinicList)} | ${pct(r.clinicList, r.checkComplete)} | ${int(r.connect)} | ${pct(r.connect, r.checkComplete)} |`
+}
+
+function userTable(label: string, rows: UserRow[], withTotal: boolean): string {
+  const body = withTotal ? [userTotal(rows), ...rows] : rows
+  return `| ${label} | 체크 완료 | 병원 목록 진입 | 병원 목록 진입률 | 병원 연결 | 병원 연결률 |
+|---|---|---|---|---|---|
+${body.map(userLine).join("\n")}`
+}
+
+// 사람 수 기준 퍼널과 판정 단계별 표. 단계별 조회가 실패하면(맞춤 측정기준 미등록 등) byLevel이 null이다.
+export function renderUserFunnel(byContent: UserRow[], byLevel: UserRow[] | null): string {
+  const levels =
+    byLevel && byLevel.length > 0
+      ? userTable("판정 단계", byLevel, false)
+      : "판정 단계별 숫자는 아직 없다. GA에 사용자 범위 맞춤 측정기준 `check_level`을 등록해야 나온다."
+  return `## 사람 수 기준 퍼널
+
+체크 완료 → 병원 목록 진입(\`/clinics\` 조회) → 병원 연결(병원 정보 보기·전화하기)을 사용자 수로 센다. 비율은 모두 체크 완료 대비다.
+
+${userTable("소재", byContent, true)}
+
+## 판정 단계별
+
+${levels}
+
+- "${NO_LEVEL}"은 판정 단계 속성이 없는 사람이다. 속성 저장 전에 체크한 사람, 공유받은 리포트로 들어와 체크하지 않은 사람, 다른 기기로 다시 들어온 사람이 여기 들어간다.
+- 소재를 옮겨 다닌 사람은 소재별 표에서 두 번 잡힐 수 있다.
+`
 }
 
 export const START = "<!-- meta-report:start -->"

@@ -2,14 +2,18 @@ import { test } from "node:test"
 import assert from "node:assert/strict"
 import {
   END,
+  NO_LEVEL,
   START,
   UNKNOWN,
   mergeRows,
   metrics,
   renderReport,
   renderSummary,
+  renderUserFunnel,
   replaceBetweenMarkers,
   total,
+  usersByContent,
+  usersByLevel,
 } from "./report.ts"
 import { parseInsights } from "./meta.ts"
 import { parseGaRows } from "./ga4.ts"
@@ -107,4 +111,48 @@ test("GA4 행을 utm_content별로 묶고, 없는 값은 알 수 없음으로 �
     { key: "A", checkStart: 0, checkComplete: 5, clinicClick: 2, clinicCall: 1, share: 0 },
     { key: UNKNOWN, checkStart: 3, checkComplete: 0, clinicClick: 0, clinicCall: 0, share: 0 },
   ])
+})
+
+test("사람 수 퍼널을 소재별·판정 단계별로 묶고, 비율은 체크 완료 대비로 쓴다", () => {
+  const content = usersByContent([
+    { value: "A", step: "checkComplete", users: 20 },
+    { value: "A", step: "clinicList", users: 8 },
+    { value: "A", step: "connect", users: 3 },
+    { value: "(not set)", step: "connect", users: 1 },
+  ])
+  assert.deepEqual(
+    content.map((r) => r.key),
+    ["A", UNKNOWN],
+  )
+  const level = usersByLevel([
+    { value: "weak", step: "checkComplete", users: 10 },
+    { value: "strong", step: "checkComplete", users: 5 },
+    { value: "strong", step: "connect", users: 2 },
+    { value: "(not set)", step: "clinicList", users: 4 },
+  ])
+  assert.deepEqual(
+    level.map((r) => r.key),
+    ["검사 권유", "신호 약함", NO_LEVEL],
+  )
+  const md = renderUserFunnel(content, level)
+  assert.match(md, /\| \*\*합계\*\* \| 20 \| 8 \| 40\.0% \| 4 \| 20\.0% \|/)
+  assert.match(md, /\| 검사 권유 \| 5 \| 0 \| 0\.0% \| 2 \| 40\.0% \|/)
+  assert.match(md, new RegExp(`\\| ${NO_LEVEL} \\| 0 \\| 4 \\| - \\|`))
+})
+
+test("판정 단계별 조회가 없으면 아직 없다고 쓴다", () => {
+  const md = renderUserFunnel([], null)
+  assert.match(md, /판정 단계별 숫자는 아직 없다/)
+})
+
+test("리포트에 사람 수 퍼널을 넣고 이벤트 수 기준임을 밝힌다", () => {
+  const md = renderReport({
+    since: "2026-10-02",
+    until: "2026-10-04",
+    generatedAt: "2026-10-05 09:00:00 KST",
+    rows: mergeRows(meta, ga),
+    userFunnel: renderUserFunnel([], null),
+  })
+  assert.match(md, /이벤트 수 기준이다/)
+  assert.match(md, /## 사람 수 기준 퍼널/)
 })

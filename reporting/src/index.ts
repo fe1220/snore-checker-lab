@@ -3,8 +3,16 @@
 import { readFile, writeFile, mkdir } from "node:fs/promises"
 import { fileURLToPath } from "node:url"
 import { fetchCampaignStart, fetchMetaRows } from "./meta.ts"
-import { fetchGaRows } from "./ga4.ts"
-import { mergeRows, renderReport, renderSummary, replaceBetweenMarkers } from "./report.ts"
+import { fetchGaRows, fetchUserFunnel } from "./ga4.ts"
+import {
+  mergeRows,
+  renderReport,
+  renderSummary,
+  renderUserFunnel,
+  replaceBetweenMarkers,
+  usersByContent,
+  usersByLevel,
+} from "./report.ts"
 
 const DOCS = fileURLToPath(new URL("../../docs/meta-ads/", import.meta.url))
 const REQUIRED = [
@@ -45,18 +53,21 @@ async function main() {
     process.exit(1)
   }
 
-  const [metaRows, gaRows] = await Promise.all([
+  const ga = {
+    propertyId: env.GA4_PROPERTY_ID,
+    keyFile: env.GA4_CREDENTIALS_FILE,
+    source: process.env.UTM_SOURCE ?? "meta",
+    country: process.env.GA4_COUNTRY ?? "South Korea",
+  }
+  const [metaRows, gaRows, contentUsers, levelUsers] = await Promise.all([
     fetchMetaRows(meta, since, until),
-    fetchGaRows(
-      {
-        propertyId: env.GA4_PROPERTY_ID,
-        keyFile: env.GA4_CREDENTIALS_FILE,
-        source: process.env.UTM_SOURCE ?? "meta",
-        country: process.env.GA4_COUNTRY ?? "South Korea",
-      },
-      since,
-      until,
-    ),
+    fetchGaRows(ga, since, until),
+    fetchUserFunnel(ga, since, until, "sessionManualAdContent"),
+    // 맞춤 측정기준(check_level)이 등록되기 전에는 조회가 실패한다. 리포트는 멈추지 않고 "아직 없다"로 쓴다.
+    fetchUserFunnel(ga, since, until, "customUser:check_level").catch((err: unknown) => {
+      console.warn(`판정 단계별 조회를 건너뛰어요: ${err instanceof Error ? err.message : err}`)
+      return null
+    }),
   ])
   if (metaRows.length === 0) {
     console.log(`메타에 ${since} ~ ${until} 집행 숫자가 아직 없어요. 리포트를 쓰지 않았어요`)
@@ -67,7 +78,16 @@ async function main() {
   const reportPath = `results/${until}.md`
   const generatedAt = `${kstDate(now)} ${now.toLocaleTimeString("en-GB", { timeZone: "Asia/Seoul" })} KST`
   await mkdir(`${DOCS}results`, { recursive: true })
-  await writeFile(`${DOCS}${reportPath}`, renderReport({ since, until, generatedAt, rows }))
+  await writeFile(`${DOCS}${reportPath}`, renderReport({
+      since,
+      until,
+      generatedAt,
+      rows,
+      userFunnel: renderUserFunnel(
+        usersByContent(contentUsers),
+        levelUsers && usersByLevel(levelUsers),
+      ),
+    }))
 
   const strategy = await readFile(`${DOCS}strategy.md`, "utf-8")
   await writeFile(`${DOCS}strategy.md`, replaceBetweenMarkers(strategy, renderSummary(rows, reportPath)))
