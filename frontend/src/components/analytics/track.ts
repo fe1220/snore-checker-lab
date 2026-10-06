@@ -36,6 +36,10 @@ export function pixel(...args: unknown[]) {
 
 export function track(event: Event) {
   const { name, ...params } = event
+  // 판정 단계를 이후 페이지뷰·병원 연결에도 붙이려고 사용자 속성으로 저장한다. 이벤트보다 먼저 설정한다.
+  if (event.name === "check_complete") {
+    window.gtag?.("set", "user_properties", { check_level: event.level })
+  }
   window.gtag?.("event", name, params)
   const pixelEvent = PIXEL_EVENTS[name]
   if (pixelEvent) pixel(...pixelEvent)
