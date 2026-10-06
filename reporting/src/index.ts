@@ -62,9 +62,12 @@ async function main() {
   const [metaRows, gaRows, contentUsers, levelUsers] = await Promise.all([
     fetchMetaRows(meta, since, until),
     fetchGaRows(ga, since, until),
-    fetchUserFunnel(ga, since, until, "sessionManualAdContent"),
-    // 맞춤 측정기준(check_level)이 등록되기 전에는 조회가 실패한다. 리포트는 멈추지 않고 "아직 없다"로 쓴다.
-    fetchUserFunnel(ga, since, until, "customUser:check_level").catch((err: unknown) => {
+    fetchUserFunnel(ga, since, until, ["sessionManualAdContent"]),
+    // 맞춤 측정기준(check_level, report_source)이 등록되기 전에는 조회가 실패한다. 리포트는 멈추지 않고 "아직 없다"로 쓴다.
+    fetchUserFunnel(ga, since, until, [
+      "customUser:check_level",
+      "customUser:report_source",
+    ]).catch((err: unknown) => {
       console.warn(`판정 단계별 조회를 건너뛰어요: ${err instanceof Error ? err.message : err}`)
       return null
     }),

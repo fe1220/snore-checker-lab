@@ -121,12 +121,12 @@ const STEPS: { field: UserStep; filter: object }[] = [
   },
 ]
 
-// 소재별(sessionManualAdContent) 또는 판정 단계별(customUser:check_level)로 사용자 수를 센다.
+// 소재별(sessionManualAdContent) 또는 판정 단계·리포트 출처별(customUser:check_level, customUser:report_source)로 사용자 수를 센다.
 export async function fetchUserFunnel(
   c: GaConfig,
   since: string,
   until: string,
-  dimension: "sessionManualAdContent" | "customUser:check_level",
+  dimensions: string[],
 ): Promise<UserCount[]> {
   const client = new BetaAnalyticsDataClient({ keyFilename: c.keyFile })
   const results = await Promise.all(
@@ -134,7 +134,7 @@ export async function fetchUserFunnel(
       const [res] = await client.runReport({
         property: `properties/${c.propertyId}`,
         dateRanges: [{ startDate: since, endDate: until }],
-        dimensions: [{ name: dimension }],
+        dimensions: dimensions.map((name) => ({ name })),
         metrics: [{ name: "totalUsers" }],
         dimensionFilter: {
           andGroup: { expressions: [...baseFilters(c), filter] },
@@ -149,7 +149,7 @@ export async function fetchUserFunnel(
 
 export function parseUserRows(rows: GaApiRow[], step: UserStep): UserCount[] {
   return rows.map((row) => ({
-    value: row.dimensionValues?.[0]?.value ?? "",
+    values: (row.dimensionValues ?? []).map((d) => d.value ?? ""),
     step,
     users: Number(row.metricValues?.[0]?.value ?? 0),
   }))

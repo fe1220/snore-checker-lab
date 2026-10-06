@@ -115,28 +115,30 @@ test("GA4 행을 utm_content별로 묶고, 없는 값은 알 수 없음으로 �
 
 test("사람 수 퍼널을 소재별·판정 단계별로 묶고, 비율은 체크 완료 대비로 쓴다", () => {
   const content = usersByContent([
-    { value: "A", step: "checkComplete", users: 20 },
-    { value: "A", step: "clinicList", users: 8 },
-    { value: "A", step: "connect", users: 3 },
-    { value: "(not set)", step: "connect", users: 1 },
+    { values: ["A"], step: "checkComplete", users: 20 },
+    { values: ["A"], step: "clinicList", users: 8 },
+    { values: ["A"], step: "connect", users: 3 },
+    { values: ["(not set)"], step: "connect", users: 1 },
   ])
   assert.deepEqual(
     content.map((r) => r.key),
     ["A", UNKNOWN],
   )
   const level = usersByLevel([
-    { value: "weak", step: "checkComplete", users: 10 },
-    { value: "strong", step: "checkComplete", users: 5 },
-    { value: "strong", step: "connect", users: 2 },
-    { value: "(not set)", step: "clinicList", users: 4 },
+    { values: ["weak", "self"], step: "checkComplete", users: 10 },
+    { values: ["strong", "self"], step: "checkComplete", users: 5 },
+    { values: ["strong", "self"], step: "connect", users: 2 },
+    { values: ["strong", "shared"], step: "connect", users: 1 },
+    { values: ["(not set)", "(not set)"], step: "clinicList", users: 4 },
   ])
   assert.deepEqual(
     level.map((r) => r.key),
-    ["검사 권유", "신호 약함", NO_LEVEL],
+    ["검사 권유 · 직접 체크", "검사 권유 · 공유받음", "신호 약함 · 직접 체크", NO_LEVEL],
   )
   const md = renderUserFunnel(content, level)
   assert.match(md, /\| \*\*합계\*\* \| 20 \| 8 \| 40\.0% \| 4 \| 20\.0% \|/)
-  assert.match(md, /\| 검사 권유 \| 5 \| 0 \| 0\.0% \| 2 \| 40\.0% \|/)
+  assert.match(md, /\| 검사 권유 · 직접 체크 \| 5 \| 0 \| 0\.0% \| 2 \| 40\.0% \|/)
+  assert.match(md, /\| 검사 권유 · 공유받음 \| 0 \| 0 \| - \| 1 \| - \|/)
   assert.match(md, new RegExp(`\\| ${NO_LEVEL} \\| 0 \\| 4 \\| - \\|`))
 })
 

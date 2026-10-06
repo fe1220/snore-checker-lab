@@ -21,7 +21,7 @@ export type Row = MetaRow & Omit<GaRow, "key">
 
 // 사람 수 기준 퍼널. 이벤트 수와 달리 한 사람이 병원 여러 곳을 눌러도 한 번만 센다.
 export type UserStep = "checkComplete" | "clinicList" | "connect"
-export type UserCount = { value: string; step: UserStep; users: number } // value: utm_content 또는 check_level
+export type UserCount = { values: string[]; step: UserStep; users: number } // 측정기준 값: [utm_content] 또는 [check_level, report_source]
 export type UserRow = { key: string } & Record<UserStep, number>
 
 export const UNKNOWN = "알 수 없음"
@@ -181,10 +181,10 @@ export function renderSummary(rows: Row[], reportPath: string): string {
 
 const blank = (value: string): boolean => !value || value === "(not set)"
 
-function groupUsers(counts: UserCount[], keyOf: (value: string) => string): UserRow[] {
+function groupUsers(counts: UserCount[], keyOf: (values: string[]) => string): UserRow[] {
   const rows = new Map<string, UserRow>()
   for (const c of counts) {
-    const key = keyOf(c.value)
+    const key = keyOf(c.values)
     const r =
       rows.get(key) ??
       rows.set(key, { key, checkComplete: 0, clinicList: 0, connect: 0 }).get(key)!
@@ -194,14 +194,29 @@ function groupUsers(counts: UserCount[], keyOf: (value: string) => string): User
 }
 
 export function usersByContent(counts: UserCount[]): UserRow[] {
-  return groupUsers(counts, (v) => (blank(v) ? UNKNOWN : v.trim())).sort(
+  return groupUsers(counts, ([v = ""]) => (blank(v) ? UNKNOWN : v.trim())).sort(
     (a, b) => order(a.key) - order(b.key) || a.key.localeCompare(b.key),
   )
 }
 
+const SOURCE_NAMES: Record<string, string> = { self: "직접 체크", shared: "공유받음" }
+
+function levelKey([level = "", source = ""]: string[]): string {
+  const name = LEVEL_NAMES[level]
+  if (!name) return NO_LEVEL
+  return SOURCE_NAMES[source] ? `${name} · ${SOURCE_NAMES[source]}` : name
+}
+
 export function usersByLevel(counts: UserCount[]): UserRow[] {
-  const names = [...Object.values(LEVEL_NAMES), NO_LEVEL]
-  return groupUsers(counts, (v) => LEVEL_NAMES[v] ?? NO_LEVEL).sort(
+  const names = [
+    ...Object.values(LEVEL_NAMES).flatMap((n) => [
+      `${n} · ${SOURCE_NAMES.self}`,
+      `${n} · ${SOURCE_NAMES.shared}`,
+      n,
+    ]),
+    NO_LEVEL,
+  ]
+  return groupUsers(counts, levelKey).sort(
     (a, b) => names.indexOf(a.key) - names.indexOf(b.key),
   )
 }
@@ -235,7 +250,7 @@ export function renderUserFunnel(byContent: UserRow[], byLevel: UserRow[] | null
   const levels =
     byLevel && byLevel.length > 0
       ? userTable("판정 단계", byLevel, false)
-      : "판정 단계별 숫자는 아직 없다. GA에 사용자 범위 맞춤 측정기준 `check_level`을 등록해야 나온다."
+      : "판정 단계별 숫자는 아직 없다. GA에 사용자 범위 맞춤 측정기준 `check_level`, `report_source`를 등록해야 나온다."
   return `## 사람 수 기준 퍼널
 
 체크 완료 → 병원 목록 진입(\`/clinics\` 조회) → 병원 연결(병원 정보 보기·전화하기)을 사용자 수로 센다. 비율은 모두 체크 완료 대비다.
@@ -246,7 +261,8 @@ ${userTable("소재", byContent, true)}
 
 ${levels}
 
-- "${NO_LEVEL}"은 판정 단계 속성이 없는 사람이다. 속성 저장 전에 체크한 사람, 공유받은 리포트로 들어와 체크하지 않은 사람, 다른 기기로 다시 들어온 사람이 여기 들어간다.
+- "공유받음"은 공유 링크로 리포트를 연 사람이다. 직접 체크하지 않아 체크 완료가 0이고 비율은 -로 나온다. 사람 수로 본다.
+- "${NO_LEVEL}"은 판정 단계 속성이 없는 사람이다. 속성 저장 전에 체크한 사람, 다른 기기로 다시 들어온 사람이 여기 들어간다.
 - 소재를 옮겨 다닌 사람은 소재별 표에서 두 번 잡힐 수 있다.
 `
 }

@@ -20,6 +20,8 @@
 |---|---|---|---|---|---|
 | 1 | 사용자 속성 저장 | `frontend/src/components/analytics/track.ts` | frontend-implementer | 없음 | 2와 병렬 |
 | 2 | 리포트 퍼널·단계별 표 | `reporting/src/ga4.ts`, `report.ts`, `index.ts`, `report.test.ts` | 메인 세션 | 없음 | 1과 병렬 |
+| 1-1 | 공유받은 리포트 속성 | `frontend/src/components/analytics/track.ts`, `frontend/src/components/sleep/report-view.tsx` | frontend-implementer | 1 | 2-1과 병렬 |
+| 2-1 | 리포트 단계별 표에 출처 나누기 | `reporting/src/ga4.ts`, `report.ts`, `report.test.ts` | 메인 세션 | 2 | 1-1과 병렬 |
 | 3 | 문서 | `docs/architecture.md`(분석 흐름이 있으면), `docs/meta-ads/strategy.md`(볼 숫자) | 메인 세션 | 1·2 | - |
 | 4 | GA 맞춤 측정기준 등록 | GA 관리자 화면 | 사용자 | 1 배포 후 | - |
 
@@ -28,6 +30,12 @@
 - `track()`이 `check_complete`를 보낼 때, 이벤트보다 먼저 `gtag("set", "user_properties", { check_level: level })`을 부른다.
 - 다른 이벤트는 바꾸지 않는다.
 - 검증: `pnpm --dir frontend test`, 타입 체크, 로컬에서 체크를 끝낸 뒤 `window.dataLayer`에 `set user_properties`가 이벤트보다 먼저 들어갔는지 확인.
+
+### Task 1-1: 공유받은 리포트 속성
+
+- `track.ts`에 사용자 속성을 저장하는 함수를 둔다. `check_complete`는 `{ check_level, report_source: "self" }`를 저장한다.
+- `report-view.tsx`: 공유받은 리포트(`shared`)를 열고 해시가 유효하면, 해시에서 계산한 판정 단계로 `{ check_level, report_source: "shared" }`를 한 번 저장한다. 해시 자체는 보내지 않는다.
+- 검증: `make fe-check`, 로컬에서 공유 링크를 연 뒤 `window.dataLayer` 확인.
 
 ### Task 2: 리포트 퍼널·단계별 표
 
@@ -44,6 +52,11 @@
 - `report.test.ts`: 퍼널 표, 단계별 표, 단계별 조회가 `null`일 때의 문구를 테스트한다.
 - 검증: `make reporting-check`.
 
+### Task 2-1: 단계별 표에 출처 나누기
+
+- 판정 단계별 조회의 측정기준을 `customUser:check_level`, `customUser:report_source` 두 개로 한다. 줄 이름은 "검사 권유 · 직접 체크", "검사 권유 · 공유받음"처럼 쓴다.
+- 검증: `make reporting-check`.
+
 ### Task 3: 문서
 
 - `docs/meta-ads/strategy.md`의 "볼 숫자"에 판정 단계별 병원 연결률을 더한다.
@@ -51,7 +64,7 @@
 
 ### Task 4: GA 맞춤 측정기준 등록 (사용자)
 
-- GA 관리자 → 맞춤 정의 → 맞춤 측정기준 만들기 → 범위 "사용자", 사용자 속성 `check_level`.
+- GA 관리자 → 맞춤 정의 → 맞춤 측정기준 만들기 → 범위 "사용자", 사용자 속성 `check_level`, `report_source` 두 개.
 - Task 1 배포 후, 2차 광고 전에 한다.
 
 ## 검증 기준
