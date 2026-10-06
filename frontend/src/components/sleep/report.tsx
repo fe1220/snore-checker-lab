@@ -18,10 +18,12 @@ import {
   LEVEL_COPY,
   MODERATE_MIN,
   QUESTIONS,
+  REPORT_COPY,
   STRONG_QUESTIONS,
   TOO_EARLY_COPY,
   type Level,
   type Question,
+  type Role,
 } from "@/lib/sleep-check"
 import { cn } from "cn"
 
@@ -196,14 +198,16 @@ export function Report({
   signals,
   tooEarly,
   shared,
+  role,
 }: {
   level: Level
   signals: Question[]
   tooEarly: boolean
   shared: boolean
+  role: Role
 }) {
   const copy = tooEarly
-    ? { ...LEVEL_COPY[level], ...TOO_EARLY_COPY.partner }
+    ? { ...LEVEL_COPY[level], ...TOO_EARLY_COPY[role] }
     : LEVEL_COPY[level]
 
   return (
@@ -212,7 +216,7 @@ export function Report({
         <p className="text-base text-muted-foreground tabular-nums">
           {shared
             ? "함께 자는 사람이 옆에서 보고 답한 리포트예요"
-            : `수면 진단 리포트 · 옆에서 본 ${QUESTIONS.length}가지 질문`}
+            : REPORT_COPY[role].header}
         </p>
         <div className="flex flex-col gap-3">
           {shared && level !== "weak" && (
@@ -235,7 +239,7 @@ export function Report({
       </header>
 
       <ReportCard
-        title="옆에서 본 신호"
+        title={REPORT_COPY[role].signalsTitle}
         note={`${QUESTIONS.length}개 중 ${signals.length}개`}
       >
         {signals.length === 0 ? (
@@ -257,7 +261,7 @@ export function Report({
                 )}
                 {/* 글자를 키우면 옆에 둔 칩이 본문을 밀어내서 칩을 본문 아래에 둔다. */}
                 <span className="flex flex-1 flex-col">
-                  {signal.text.partner}
+                  {signal.text[role]}
                   {signal.strong && (
                     <span className="text-base font-semibold text-warning">
                       주요 신호
@@ -390,7 +394,7 @@ export function Report({
               <ul className="flex list-disc flex-col gap-1 pl-4">
                 <li>
                   병원에서 수면무호흡증을 가려낼 때 쓰는 질문(STOP-Bang)을
-                  바탕으로 만들었어요. 옆에서 볼 수 있는 것만 묻도록 바꿨어요.
+                  바탕으로 만들었어요. {REPORT_COPY[role].basis}
                 </li>
                 <li>
                   숨 멈춤과 헐떡임은 미국수면학회가 꼽는 주요 증상이에요.{" "}

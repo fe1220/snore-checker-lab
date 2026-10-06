@@ -99,15 +99,17 @@ export const GUIDE: Record<Role, string> = {
 // 리포트 머리말과 신호 카드 제목. 공유받은 리포트는 배우자 경로에서만 만들어진다.
 export const REPORT_COPY: Record<
   Role,
-  { header: string; signalsTitle: string }
+  { header: string; signalsTitle: string; basis: string }
 > = {
   self: {
     header: `수면 진단 리포트 · 내가 답한 ${QUESTIONS.length}가지 질문`,
     signalsTitle: "내가 답한 신호",
+    basis: "스스로 느끼거나 다른 사람에게 들은 것으로 답하도록 바꿨어요.",
   },
   partner: {
     header: `수면 진단 리포트 · 옆에서 본 ${QUESTIONS.length}가지 질문`,
     signalsTitle: "옆에서 본 신호",
+    basis: "옆에서 볼 수 있는 것만 묻도록 바꿨어요.",
   },
 }
 

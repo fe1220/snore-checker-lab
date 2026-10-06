@@ -12,6 +12,7 @@ import {
   isTooEarly,
   judge,
   toReportHash,
+  type Role,
 } from "@/lib/sleep-check"
 import { cn } from "cn"
 
@@ -29,7 +30,7 @@ function useHash() {
   )
 }
 
-export function ReportView({ shared }: { shared: boolean }) {
+export function ReportView({ shared, role }: { shared: boolean; role: Role }) {
   const hash = useHash()
 
   // 공유받은 리포트를 연 사람도 판정 단계별로 볼 수 있게 출처를 붙여 저장한다. 해시는 보내지 않는다.
@@ -53,10 +54,7 @@ export function ReportView({ shared }: { shared: boolean }) {
         <p className="text-lg text-muted-foreground">
           주소가 잘렸거나 잘못 복사됐어요.
         </p>
-        <Link
-          href="/check"
-          className={cn(buttonVariants({ size: "cta" }), "px-6")}
-        >
+        <Link href="/" className={cn(buttonVariants({ size: "cta" }), "px-6")}>
           {shared ? "진단하기" : "다시 진단하기"}
         </Link>
       </main>
@@ -74,6 +72,7 @@ export function ReportView({ shared }: { shared: boolean }) {
           signals={answers.signals}
           tooEarly={isTooEarly(level, answers.unknowns)}
           shared={shared}
+          role={role}
         />
       </div>
       <div className="sticky bottom-0 flex flex-col gap-2 border-t bg-background p-4">
@@ -83,7 +82,8 @@ export function ReportView({ shared }: { shared: boolean }) {
         >
           근처 수면클리닉 찾기
         </Link>
-        {!shared && <ShareButton path={sharePath} />}
+        {/* 당사자는 본인이 병원에 갈 사람이라 공유가 다음 행동이 아니다. 공유 링크는 배우자 경로에서만 만든다. */}
+        {!shared && role === "partner" && <ShareButton path={sharePath} />}
       </div>
     </main>
   )
