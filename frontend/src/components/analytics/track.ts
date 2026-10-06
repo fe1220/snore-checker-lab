@@ -34,11 +34,20 @@ export function pixel(...args: unknown[]) {
   window.fbq?.(...args)
 }
 
+// 판정 단계와 리포트 출처를 이후 페이지뷰·병원 연결에도 붙이려고 사용자 속성으로 저장한다.
+// 응답 자체는 보내지 않는다.
+export function setReportUser(properties: {
+  check_level: string
+  report_source: "self" | "shared"
+}) {
+  window.gtag?.("set", "user_properties", properties)
+}
+
 export function track(event: Event) {
   const { name, ...params } = event
-  // 판정 단계를 이후 페이지뷰·병원 연결에도 붙이려고 사용자 속성으로 저장한다. 이벤트보다 먼저 설정한다.
+  // 이벤트보다 먼저 설정해야 check_complete에도 속성이 붙는다.
   if (event.name === "check_complete") {
-    window.gtag?.("set", "user_properties", { check_level: event.level })
+    setReportUser({ check_level: event.level, report_source: "self" })
   }
   window.gtag?.("event", name, params)
   const pixelEvent = PIXEL_EVENTS[name]

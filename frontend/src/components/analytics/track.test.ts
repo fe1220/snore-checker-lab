@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
-import { track } from "./track"
+import { setReportUser, track } from "./track"
 
 describe("track", () => {
   let gtag: ReturnType<typeof vi.fn>
@@ -18,7 +18,11 @@ describe("track", () => {
     track({ name: "check_complete", level: "strong" })
 
     expect(gtag.mock.calls).toEqual([
-      ["set", "user_properties", { check_level: "strong" }],
+      [
+        "set",
+        "user_properties",
+        { check_level: "strong", report_source: "self" },
+      ],
       ["event", "check_complete", { level: "strong" }],
     ])
   })
@@ -30,6 +34,18 @@ describe("track", () => {
     expect(gtag.mock.calls).toEqual([
       ["event", "check_start", {}],
       ["event", "share_click", {}],
+    ])
+  })
+
+  it("공유받은 리포트 속성을 그대로 사용자 속성으로 설정한다", () => {
+    setReportUser({ check_level: "weak", report_source: "shared" })
+
+    expect(gtag.mock.calls).toEqual([
+      [
+        "set",
+        "user_properties",
+        { check_level: "weak", report_source: "shared" },
+      ],
     ])
   })
 })

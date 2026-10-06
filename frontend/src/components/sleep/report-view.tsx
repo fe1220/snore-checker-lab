@@ -1,7 +1,8 @@
 "use client"
 
 import Link from "next/link"
-import { useSyncExternalStore } from "react"
+import { useEffect, useSyncExternalStore } from "react"
+import { setReportUser } from "@/components/analytics/track"
 import { buttonVariants } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Report } from "@/components/sleep/report"
@@ -30,6 +31,17 @@ function useHash() {
 
 export function ReportView({ shared }: { shared: boolean }) {
   const hash = useHash()
+
+  // 공유받은 리포트를 연 사람도 판정 단계별로 볼 수 있게 출처를 붙여 저장한다. 해시는 보내지 않는다.
+  useEffect(() => {
+    if (!shared || hash === null) return
+    const answers = fromReportHash(hash)
+    if (!answers) return
+    setReportUser({
+      check_level: judge(answers.signals),
+      report_source: "shared",
+    })
+  }, [shared, hash])
 
   if (hash === null) return <ReportSkeleton />
 
