@@ -1,3 +1,5 @@
+import type { Role } from "@/lib/sleep-check"
+
 declare global {
   interface Window {
     gtag?: (...args: unknown[]) => void
@@ -6,7 +8,7 @@ declare global {
 }
 
 type Event =
-  | { name: "check_start" }
+  | { name: "check_start"; role: Role }
   | { name: "check_complete"; level: string }
   | { name: "share_click" }
   | {
@@ -43,9 +45,15 @@ export function setReportUser(properties: {
   window.gtag?.("set", "user_properties", properties)
 }
 
+// 첫 질문에서 고른 경로(당사자/배우자)를 이후 이벤트에도 붙이려고 사용자 속성으로 저장한다.
+export function setRespondentRole(role: Role) {
+  window.gtag?.("set", "user_properties", { respondent_role: role })
+}
+
 export function track(event: Event) {
   const { name, ...params } = event
-  // 이벤트보다 먼저 설정해야 check_complete에도 속성이 붙는다.
+  // 이벤트보다 먼저 설정해야 그 이벤트에도 속성이 붙는다.
+  if (event.name === "check_start") setRespondentRole(event.role)
   if (event.name === "check_complete") {
     setReportUser({ check_level: event.level, report_source: "self" })
   }
