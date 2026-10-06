@@ -203,7 +203,7 @@ export function Report({
   shared: boolean
 }) {
   const copy = tooEarly
-    ? { ...LEVEL_COPY[level], ...TOO_EARLY_COPY }
+    ? { ...LEVEL_COPY[level], ...TOO_EARLY_COPY.partner }
     : LEVEL_COPY[level]
 
   return (
@@ -257,7 +257,7 @@ export function Report({
                 )}
                 {/* 글자를 키우면 옆에 둔 칩이 본문을 밀어내서 칩을 본문 아래에 둔다. */}
                 <span className="flex flex-1 flex-col">
-                  {signal.text}
+                  {signal.text.partner}
                   {signal.strong && (
                     <span className="text-base font-semibold text-warning">
                       주요 신호

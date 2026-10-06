@@ -2,10 +2,15 @@ import { describe, expect, it } from "vitest"
 
 import {
   fromReportHash,
+  GUIDE,
   isTooEarly,
   judge,
+  parseRole,
   QUESTIONS,
+  REPORT_COPY,
+  ROLES,
   STRONG_QUESTIONS,
+  TOO_EARLY_COPY,
   toReportHash,
 } from "./sleep-check"
 
@@ -103,6 +108,32 @@ describe("toReportHash / fromReportHash", () => {
       "dh",
     ]) {
       expect(fromReportHash(hash)).toBeNull()
+    }
+  })
+})
+
+describe("경로", () => {
+  it("self와 partner만 경로로 읽는다", () => {
+    expect(parseRole("self")).toBe("self")
+    expect(parseRole("partner")).toBe("partner")
+    for (const value of [undefined, null, "", "heal", "SELF", ["self"]]) {
+      expect(parseRole(value)).toBeNull()
+    }
+  })
+
+  it("모든 질문에 두 경로 문구가 있다", () => {
+    expect(QUESTIONS).toHaveLength(9)
+    for (const q of QUESTIONS) {
+      for (const role of ROLES) expect(q.text[role]).toBeTruthy()
+    }
+  })
+
+  it("경로별 안내·리포트·판단 보류 문구가 모두 있다", () => {
+    for (const role of ROLES) {
+      expect(GUIDE[role]).toBeTruthy()
+      expect(REPORT_COPY[role].header).toContain(`${QUESTIONS.length}가지`)
+      expect(REPORT_COPY[role].signalsTitle).toBeTruthy()
+      expect(TOO_EARLY_COPY[role].title).toBe("아직 판단하기 일러요")
     }
   })
 })
