@@ -1,5 +1,5 @@
 {
-  "crawledAt": "2026-10-05T10:42:30.091Z",
+  "crawledAt": "2026-10-11T21:17:32.267Z",
   "hiraVersion": "2026.6",
   "items": [
     {
@@ -8656,7 +8656,7 @@
       "lng": 127.0098676,
       "sourceUrl": "https://www.resmed.kr/psg-finder/seoulboasent",
       "region": "서울",
-      "homepage": "http://www.boazent.co.kr",
+      "homepage": null,
       "listed": false,
       "kind": "의원"
     },
